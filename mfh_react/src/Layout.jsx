@@ -5,6 +5,7 @@ import {
   FaFolderOpen, FaBoxes, FaUsers, FaUserTie, FaBuilding,
   FaChartPie, FaChartBar, FaBars, FaTimes, FaCog, FaShieldAlt,
   FaArchive, FaFileExport, FaUserShield, FaQuestionCircle, FaTh, FaMobileAlt,
+  FaTools,
 } from "react-icons/fa";
 
 const SIDEBAR_W = 240;
@@ -49,6 +50,12 @@ const MENU_ALL = [
     items: [
       { path: "/export",       label: "Export",       icon: <FaFileExport /> },
       { path: "/utilisateurs", label: "Utilisateurs", icon: <FaUserShield /> },
+    ],
+  },
+  {
+    roles: ["ADMIN"],
+    items: [
+      { path: import.meta.env.VITE_DJANGO_ADMIN_URL || "http://127.0.0.1:8000/admin/", label: "Admin MFH", icon: <FaTools />, external: true },
     ],
   },
 ];
@@ -195,7 +202,24 @@ export default function Layout({ user, onLogout }) {
               />
             ) : (
               <div key={si}>
-                {section.items.map(item => (
+                {section.items.map(item => item.external ? (
+                  <button
+                    key={item.path}
+                    onClick={() => { window.location.href = item.path; }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "10px 20px", width: "100%",
+                      color: "#fbbf24", background: "transparent",
+                      border: "none", cursor: "pointer",
+                      fontWeight: 600, fontSize: 15,
+                      borderRadius: "0 24px 24px 0",
+                      marginRight: 12, marginBottom: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ) : (
                   <NavLink
                     key={item.path}
                     to={item.path}

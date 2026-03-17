@@ -31,7 +31,6 @@ export default function App() {
     const u = getUser(); const t = getToken();
     return u && t ? u : null;
   });
-
   // Rafraîchir depuis /api/auth/me/ si rôle ou commercial_id manquant (ancienne session)
   useEffect(() => {
     if (user && (!user.role || user.commercial_id === undefined)) {

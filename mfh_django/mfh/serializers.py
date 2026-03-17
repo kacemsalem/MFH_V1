@@ -58,7 +58,6 @@ class DossierSerializer(serializers.ModelSerializer):
     client_display     = serializers.SerializerMethodField()
     notaire_display    = serializers.SerializerMethodField()
     commercial_display = serializers.SerializerMethodField()
-
     class Meta:
         model = Dossier
         fields = "__all__"

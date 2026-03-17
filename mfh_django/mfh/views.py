@@ -237,9 +237,11 @@ class SyntheseView(APIView):
         libre_lots   = [l for l in lots_qs if l.situation_reelle == "LIBRE"]
 
         def _prix(lot):
-            """Prix réel si dossier actif, sinon prix de référence."""
+            """Prix réel (dossier) si disponible, sinon prix de référence (lot)."""
             d = active_doss.get(lot.id)
-            return float(d.prix_vente or 0) if d else float(lot.prix_reference or 0)
+            if d and d.prix_vente:
+                return float(d.prix_vente)
+            return float(lot.prix_reference or 0)
 
         value_sold     = sum(_prix(l) for l in vendu_lots)
         value_reserved = sum(_prix(l) for l in reserve_lots)
@@ -336,7 +338,7 @@ class SyntheseView(APIView):
                     "total_encaisse": 0.0,
                     "surface_vendu": 0, "surface_reserve": 0,
                 }
-            prix = float(d.prix_vente or 0)
+            prix = float(d.prix_vente or d.lot.prix_reference or 0)
             enc  = float(d.total_enc or 0)
             surf = int(d.lot.surface or 0)
             if d.situation_dossier == "VENTE":
@@ -556,6 +558,7 @@ class MeView(APIView):
             "fullname":      u.get_full_name() or u.username,
             "role":          role,
             "commercial_id": comm.id if comm else None,
+            "is_staff":      u.is_staff or u.is_superuser,
         })
 
 
