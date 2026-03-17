@@ -1,8 +1,11 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
-from .models import Client, Notaire, Commercial, Lot, Dossier, Caisse
+from .models import Client, Notaire, Commercial, Lot, Dossier, Caisse, HistoriqueLot, UserProfile
+
+User = get_user_model()
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -24,11 +27,20 @@ class CommercialSerializer(serializers.ModelSerializer):
 
 
 class LotSerializer(serializers.ModelSerializer):
-    # Situation calculée depuis les dossiers (priorité sur le champ stocké)
-    situation = serializers.SerializerMethodField()
+    # Situation affichée = annotation situation_reelle si dispo, sinon champ DB
+    # Le champ situation reste writable pour les sauvegardes du formulaire
+    commercial_option_display = serializers.SerializerMethodField()
 
-    def get_situation(self, obj):
-        return getattr(obj, "situation_reelle", obj.situation)
+    def get_commercial_option_display(self, obj):
+        c = obj.commercial_option
+        return c.nom_prenom if c else None
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        sit = getattr(instance, "situation_reelle", None)
+        if sit:
+            ret["situation"] = sit
+        return ret
 
     class Meta:
         model = Lot
@@ -52,16 +64,25 @@ class DossierSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     def get_total_recu(self, obj):
-        return str(obj.total_recu)
+        v = getattr(obj, "total_recu_ann", None)
+        return str(v if v is not None else obj.total_recu)
 
     def get_total_livre(self, obj):
-        return str(obj.total_livre)
+        v = getattr(obj, "total_livre_ann", None)
+        return str(v if v is not None else obj.total_livre)
 
     def get_montant_restant(self, obj):
-        return str(obj.montant_restant)
+        total_recu = getattr(obj, "total_recu_ann", None)
+        if total_recu is None:
+            return str(obj.montant_restant)
+        return str((obj.prix_vente or 0) - total_recu)
 
     def get_solde_caisse(self, obj):
-        return str(obj.solde_caisse)
+        total_recu  = getattr(obj, "total_recu_ann",  None)
+        total_livre = getattr(obj, "total_livre_ann", None)
+        if total_recu is None or total_livre is None:
+            return str(obj.solde_caisse)
+        return str(total_recu - total_livre)
 
     def get_lot_display(self, obj):
         try:
@@ -130,3 +151,85 @@ class CaisseSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         return self._wrap(super().update, instance, validated_data)
+
+
+class HistoriqueLotSerializer(serializers.ModelSerializer):
+    commercial_display = serializers.SerializerMethodField()
+    lot_display        = serializers.SerializerMethodField()
+
+    def get_commercial_display(self, obj):
+        return obj.commercial.nom_prenom if obj.commercial else "—"
+
+    def get_lot_display(self, obj):
+        l = obj.lot
+        return f"Îlot {l.ilot} – Lot {l.lot} (Tr.{l.tranche})"
+
+    class Meta:
+        model = HistoriqueLot
+        fields = "__all__"
+
+
+# ── Utilisateurs + profils ────────────────────────────────────────────────────
+
+class UserWithProfileSerializer(serializers.ModelSerializer):
+    role               = serializers.SerializerMethodField()
+    commercial_id      = serializers.SerializerMethodField()
+    commercial_name    = serializers.SerializerMethodField()
+    password           = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model  = User
+        fields = ["id", "username", "email", "first_name", "last_name",
+                  "is_active", "role", "commercial_id", "commercial_name", "password"]
+
+    def get_role(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.role if profile else "VIEWER"
+
+    def get_commercial_id(self, obj):
+        entity = getattr(obj, "commercial_entity", None)
+        return entity.id if entity else None
+
+    def get_commercial_name(self, obj):
+        entity = getattr(obj, "commercial_entity", None)
+        return entity.nom_prenom if entity else None
+
+    def _apply_role_and_commercial(self, user, data):
+        role = data.get("role")
+        if role:
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            profile.role = role
+            profile.save()
+
+        commercial_id = data.get("commercial_id")
+        if commercial_id is not None:
+            try:
+                comm = Commercial.objects.get(pk=commercial_id)
+                comm.user = user
+                comm.save(update_fields=["user"])
+            except Commercial.DoesNotExist:
+                pass
+        elif data.get("commercial_id") == "":
+            # Détacher le commercial lié
+            Commercial.objects.filter(user=user).update(user=None)
+
+    def create(self, validated_data):
+        password = validated_data.pop("password", None)
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save()
+        self._apply_role_and_commercial(user, self.initial_data)
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        self._apply_role_and_commercial(instance, self.initial_data)
+        return instance

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { FaUserPlus, FaListUl, FaUserTie, FaEnvelope, FaPhone, FaIdCard, FaBuilding, FaStickyNote } from "react-icons/fa";
 import { Card, PageHeader, DataTable } from "./ui-kit";
+import { useAuth } from "./AuthContext";
 
-const API_URL = "http://localhost:8000/api/clients/";
+const API_URL = "/api/clients/";
 
 const initialForm = {
   nom_prenom_client: "", cin_client: "", tel_client: "",
@@ -74,11 +75,14 @@ function ClientForm({ editId, editData, onSuccess, onCancel }) {
 }
 
 export default function ClientPage() {
+  const { role } = useAuth(); const canEdit = role === "ADMIN";
   const [mode, setMode]         = useState("list");
   const [items, setItems]       = useState([]);
   const [refresh, setRefresh]   = useState(false);
   const [editId, setEditId]     = useState(null);
   const [editData, setEditData] = useState(null);
+
+  useEffect(() => { if (mode === "form" && !canEdit) setMode("list"); }, [canEdit, mode]);
 
   useEffect(() => {
     fetch(API_URL).then(r => r.json()).then(d => setItems(d)).catch(() => setItems([]));
@@ -105,23 +109,25 @@ export default function ClientPage() {
     { key: "email_client",      header: "Email" },
     { key: "statut_client",     header: "Statut" },
     { key: "obs_client",        header: "Observations" },
-    { key: "_actions", header: "",
+    ...(canEdit ? [{ key: "_actions", header: "",
       render: (_, row) => (
         <span style={{ display:"flex", gap:6 }}>
           <button onClick={() => handleEdit(row)}      style={btnModifier}>Modifier</button>
           <button onClick={() => handleDelete(row.id)} style={btnSupprimer}>Supprimer</button>
         </span>
       )
-    },
+    }] : []),
   ];
 
   return (
     <div>
       <div className="flex justify-center mb-8 gap-2">
-        <button className={`px-5 py-2 rounded-l-lg bg-blue-600 text-white shadow font-semibold text-lg ${mode==="form"?"ring-2 ring-blue-400":"opacity-80"}`}
-          onClick={() => { setEditId(null); setEditData(null); setMode("form"); }}>
-          <FaUserPlus className="inline mr-2" />Saisie
-        </button>
+        {canEdit && (
+          <button className={`px-5 py-2 rounded-l-lg bg-blue-600 text-white shadow font-semibold text-lg ${mode==="form"?"ring-2 ring-blue-400":"opacity-80"}`}
+            onClick={() => { setEditId(null); setEditData(null); setMode("form"); }}>
+            <FaUserPlus className="inline mr-2" />Saisie
+          </button>
+        )}
         <button className={`px-5 py-2 rounded-r-lg bg-green-600 text-white shadow font-semibold text-lg ${mode==="list"?"ring-2 ring-green-400":"opacity-80"}`}
           onClick={() => { setMode("list"); setRefresh(r => !r); }}>
           <FaListUl className="inline mr-2" />Liste

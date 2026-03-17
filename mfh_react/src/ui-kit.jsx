@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 export function Card({ children, className = "" }) {
   return (
     <div className={`bg-white rounded-2xl shadow-lg border border-gray-100 p-6 ${className}`}>
@@ -19,7 +21,7 @@ export function SectionTitle({ children }) {
   return <h2 className="text-xl font-semibold text-gray-700 mb-4 mt-6">{children}</h2>;
 }
 
-export function DataTable({ columns, data }) {
+export const DataTable = memo(function DataTable({ columns, data }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white">
       <table className="min-w-full text-sm">
@@ -44,4 +46,4 @@ export function DataTable({ columns, data }) {
       </table>
     </div>
   );
-}
+});

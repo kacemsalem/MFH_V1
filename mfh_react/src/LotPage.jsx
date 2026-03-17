@@ -1,8 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { Card, PageHeader, DataTable } from "./ui-kit";
+import { useAuth } from "./AuthContext";
 
-const API_URL = "http://localhost:8000/api/lots/";
+const API_URL = "/api/lots/";
 
 const initialForm = {
   ilot: 0, lot: 0, tranche: "", n_titre: "", categorie: "",
@@ -11,16 +12,75 @@ const initialForm = {
 
 const SIT_COLORS = {
   LIBRE:   { bg: "#16a34a", text: "#fff" },
+  OPTION:  { bg: "#d97706", text: "#fff" },
   RESERVE: { bg: "#2563eb", text: "#fff" },
   VENDU:   { bg: "#dc2626", text: "#fff" },
 };
 
-const TRANCHE_COLORS = [
-  "#2563eb", "#7c3aed", "#0891b2", "#059669", "#d97706",
-  "#dc2626", "#db2777", "#65a30d", "#9333ea", "#0284c7",
-];
+const EV_CFG = {
+  OPTION_ACTIVE:  { label: "Option activée",   color: "#d97706", bg: "#fffbeb", icon: "🟡" },
+  OPTION_ANNULEE: { label: "Option annulée",   color: "#dc2626", bg: "#fef2f2", icon: "❌" },
+  RESERVATION:    { label: "Réservation",      color: "#2563eb", bg: "#eff6ff", icon: "📋" },
+  VENTE:          { label: "Vente",            color: "#059669", bg: "#f0fdf4", icon: "✅" },
+  DESISTEMENT:    { label: "Désistement",      color: "#dc2626", bg: "#fef2f2", icon: "↩️" },
+};
 
-function KebabMenu({ onEdit, onDelete }) {
+const fmtDate = v => v ? v.split("-").reverse().join("/") : "—";
+const fmt     = v => Number(v || 0).toLocaleString("fr-FR");
+
+function HistoTimeline({ events }) {
+  if (!events.length)
+    return <p style={{ color: "#9ca3af", fontSize: 13, padding: "20px 0" }}>Aucun événement enregistré.</p>;
+  return (
+    <div style={{ position: "relative", paddingLeft: 28 }}>
+      {/* Ligne verticale */}
+      <div style={{ position: "absolute", left: 9, top: 4, bottom: 4, width: 2, background: "#e2e8f0" }} />
+      {events.map((ev, i) => {
+        const cfg = EV_CFG[ev.type] || { label: ev.type, color: "#6b7280", bg: "#f3f4f6", icon: "•" };
+        return (
+          <div key={i} style={{ position: "relative", marginBottom: 18 }}>
+            {/* Pastille */}
+            <div style={{
+              position: "absolute", left: -28, top: 6, width: 18, height: 18,
+              borderRadius: "50%", background: cfg.color, display: "flex",
+              alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff", fontWeight: 800,
+            }}>
+              {i + 1}
+            </div>
+            {/* Carte événement */}
+            <div style={{
+              background: cfg.bg, border: `1px solid ${cfg.color}30`,
+              borderLeft: `3px solid ${cfg.color}`, borderRadius: 8,
+              padding: "10px 14px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: cfg.color, borderRadius: 20, padding: "1px 10px" }}>
+                  {cfg.icon} {cfg.label}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>{fmtDate(ev.date)}</span>
+              </div>
+              <div style={{ fontSize: 12, color: "#475569", display: "flex", flexWrap: "wrap", gap: "2px 20px" }}>
+                {ev.client     && <span>👤 <b>{ev.client}</b></span>}
+                {ev.commercial && <span>💼 {ev.commercial}</span>}
+                {ev.notaire    && <span>⚖️ {ev.notaire}</span>}
+                {ev.prix_vente && <span>💰 {fmt(ev.prix_vente)} DH</span>}
+              </div>
+              {ev.obs && (
+                <div style={{ fontSize: 12, color: "#6b7280", fontStyle: "italic", marginTop: 4, paddingTop: 4, borderTop: "1px solid #e2e8f040" }}>
+                  📝 {ev.obs}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const TRANCHE_COLOR = "#64748b"; // gris ardoise uniforme
+
+function KebabMenu({ onEdit, onDelete, onHistorique, canEdit }) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ position: "relative" }}>
@@ -42,17 +102,23 @@ function KebabMenu({ onEdit, onDelete }) {
             borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
             minWidth: 130, overflow: "hidden",
           }}>
-            <button onClick={() => { setOpen(false); onEdit(); }} style={{
+            {canEdit && <button onClick={() => { setOpen(false); onEdit(); }} style={{
               display: "block", width: "100%", textAlign: "left",
               padding: "8px 14px", fontSize: 13, background: "none",
               border: "none", cursor: "pointer", color: "#2563eb", fontWeight: 600,
-            }}>✏️ Modifier</button>
-            <button onClick={() => { setOpen(false); onDelete(); }} style={{
+            }}>✏️ Modifier</button>}
+            <button onClick={() => { setOpen(false); onHistorique(); }} style={{
+              display: "block", width: "100%", textAlign: "left",
+              padding: "8px 14px", fontSize: 13, background: "none",
+              border: "none", cursor: "pointer", color: "#7c3aed", fontWeight: 600,
+              borderTop: canEdit ? "1px solid #f1f5f9" : "none",
+            }}>📋 Historique</button>
+            {canEdit && <button onClick={() => { setOpen(false); onDelete(); }} style={{
               display: "block", width: "100%", textAlign: "left",
               padding: "8px 14px", fontSize: 13, background: "none",
               border: "none", cursor: "pointer", color: "#dc2626", fontWeight: 600,
               borderTop: "1px solid #f1f5f9",
-            }}>🗑️ Supprimer</button>
+            }}>🗑️ Supprimer</button>}
           </div>
         </>
       )}
@@ -60,9 +126,14 @@ function KebabMenu({ onEdit, onDelete }) {
   );
 }
 
-function LotKanban({ lots, onEdit, onDelete }) {
+const KANBAN_LOTS_PER_PAGE = 40;
+
+function LotKanban({ lots, onEdit, onDelete, onHistorique, canEdit }) {
   const [filtreTranche, setFiltreTranche] = useState(null);
   const [filtreSit,     setFiltreSit]     = useState(null);
+  const [kanbanPage,    setKanbanPage]    = useState(1);
+
+  if (!Array.isArray(lots)) return null;
 
   // Grouper par tranche (tri naturel)
   const tranchesMap = {};
@@ -74,7 +145,30 @@ function LotKanban({ lots, onEdit, onDelete }) {
   const allTranches = Object.keys(tranchesMap).sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true })
   );
-  const tranches = filtreTranche ? allTranches.filter(t => t === filtreTranche) : allTranches;
+
+  // Lots visibles après filtres, dans l'ordre tranche→ilot→lot
+  const visibleLots = lots
+    .filter(l => (!filtreTranche || l.tranche === filtreTranche) && (!filtreSit || l.situation === filtreSit))
+    .sort((a, b) => {
+      const tc = String(a.tranche || "").localeCompare(String(b.tranche || ""), undefined, { numeric: true });
+      if (tc !== 0) return tc;
+      const ic = Number(a.ilot) - Number(b.ilot);
+      return ic !== 0 ? ic : Number(a.lot) - Number(b.lot);
+    });
+
+  // Pagination sur les lots visibles
+  const kbTotalPages = Math.max(1, Math.ceil(visibleLots.length / KANBAN_LOTS_PER_PAGE));
+  const kbSafePage   = Math.min(kanbanPage, kbTotalPages);
+  const pageLots     = visibleLots.slice((kbSafePage - 1) * KANBAN_LOTS_PER_PAGE, kbSafePage * KANBAN_LOTS_PER_PAGE);
+
+  // Re-grouper les lots de la page par tranche
+  const pageMap = {};
+  pageLots.forEach(l => {
+    const t = l.tranche || "—";
+    if (!pageMap[t]) pageMap[t] = [];
+    pageMap[t].push(l);
+  });
+  const tranches = Object.keys(pageMap).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   if (lots.length === 0) {
     return <p style={{ color: "#6b7280", textAlign: "center", marginTop: 40 }}>Aucun lot enregistré.</p>;
@@ -91,16 +185,16 @@ function LotKanban({ lots, onEdit, onDelete }) {
 
   return (
     <div>
-      {/* Filtres */}
+      {/* Filtres + pagination */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 14, alignItems: "center" }}>
         {/* Filtre tranche */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>Tranche</span>
-          {pill("Toutes", filtreTranche === null, () => setFiltreTranche(null), "#1e293b")}
-          {allTranches.map((t, ti) =>
+          {pill("Toutes", filtreTranche === null, () => { setFiltreTranche(null); setKanbanPage(1); }, "#1e293b")}
+          {allTranches.map((t) =>
             pill(`Tr. ${t}`, filtreTranche === t,
-              () => setFiltreTranche(filtreTranche === t ? null : t),
-              TRANCHE_COLORS[ti % TRANCHE_COLORS.length], t)
+              () => { setFiltreTranche(filtreTranche === t ? null : t); setKanbanPage(1); },
+              TRANCHE_COLOR)
           )}
         </div>
         <div style={{ width: 1, height: 22, background: "#e2e8f0" }} />
@@ -114,11 +208,29 @@ function LotKanban({ lots, onEdit, onDelete }) {
         </div>
       </div>
 
+      {/* Pagination centrée */}
+      {kbTotalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <button disabled={kbSafePage <= 1} onClick={() => setKanbanPage(p => p - 1)}
+            style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #e2e8f0", background: kbSafePage <= 1 ? "#f8fafc" : "#fff", cursor: kbSafePage <= 1 ? "default" : "pointer", fontSize: 16, color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            ‹
+          </button>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#374151", minWidth: 80, textAlign: "center" }}>
+            {kbSafePage} / {kbTotalPages}
+          </span>
+          <button disabled={kbSafePage >= kbTotalPages} onClick={() => setKanbanPage(p => p + 1)}
+            style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #e2e8f0", background: kbSafePage >= kbTotalPages ? "#f8fafc" : "#fff", cursor: kbSafePage >= kbTotalPages ? "default" : "pointer", fontSize: 16, color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            ›
+          </button>
+          <span style={{ fontSize: 11, color: "#9ca3af" }}>{visibleLots.length} lots</span>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "8px 4px 16px" }}>
       {tranches.map((tranche) => {
-        const color   = TRANCHE_COLORS[allTranches.indexOf(tranche) % TRANCHE_COLORS.length];
-        const col     = tranchesMap[tranche];
-        const visible = filtreSit ? col.filter(l => l.situation === filtreSit) : col;
+        const color   = TRANCHE_COLOR;
+        const col     = tranchesMap[tranche] || [];
+        const visible = pageMap[tranche] || [];
         const libre   = col.filter(l => l.situation === "LIBRE").length;
         const reserve = col.filter(l => l.situation === "RESERVE").length;
         const vendu   = col.filter(l => l.situation === "VENDU").length;
@@ -176,7 +288,7 @@ function LotKanban({ lots, onEdit, onDelete }) {
                         }}>
                           {lot.situation}
                         </span>
-                        <KebabMenu onEdit={() => onEdit(lot)} onDelete={() => onDelete(lot.id)} />
+                        <KebabMenu onEdit={() => onEdit(lot)} onDelete={() => onDelete(lot.id)} onHistorique={() => onHistorique(lot)} canEdit={canEdit} />
                       </div>
                     </div>
 
@@ -208,15 +320,37 @@ function LotKanban({ lots, onEdit, onDelete }) {
 }
 
 export default function LotPage() {
+  const { role } = useAuth(); const canEdit = role === "ADMIN";
   const [form, setForm]     = useState(initialForm);
   const [editId, setEditId] = useState(null);
   const [mode, setMode]     = useState("kanban");
+
+  useEffect(() => { if (mode === "form" && !canEdit) setMode("kanban"); }, [canEdit, mode]);
   const [lots, setLots]     = useState([]);
   const [refresh, setRefresh] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState("");
   const [listSort,   setListSort]   = useState({ key: "tranche", dir: 1 });
   const [listFiltre, setListFiltre] = useState({ sit: "", cat: "", tranche: "" });
+
+  // Pagination liste
+  const [listPage, setListPage] = useState(1);
+  const LIST_PAGE_SIZE = 20;
+
+  // Historique lot
+  const [histoLot,    setHistoLot]    = useState(null);   // { lot, events }
+  const [histoLoading, setHistoLoading] = useState(false);
+
+  const [prevMode, setPrevMode] = useState("kanban");
+
+  const openHistorique = async (lot) => {
+    setPrevMode(mode);
+    setHistoLoading(true); setMode("historique");
+    const data = await fetch(`/api/lots/${lot.id}/historique-complet/`)
+      .then(r => { if (!r.ok) return null; return r.json(); }).catch(() => null);
+    setHistoLot(data);
+    setHistoLoading(false);
+  };
 
   const handleChange = e => {
     const { name, value } = e.target;
@@ -273,17 +407,19 @@ export default function LotPage() {
 
   useEffect(() => {
     fetch(API_URL)
-      .then(res => res.json())
-      .then(data => setLots(data))
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => setLots(Array.isArray(data) ? data : []))
       .catch(() => setLots([]));
   }, [refresh]);
+
+  useEffect(() => { setListPage(1); }, [listFiltre]);
 
 
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"center", marginBottom:28, gap:0 }}>
         {[
-          { key:"form",   label:"Saisie",  color:"#2563eb" },
+          ...(canEdit ? [{ key:"form", label:"Saisie", color:"#2563eb" }] : []),
           { key:"list",   label:"Liste",   color:"#0891b2" },
           { key:"kanban", label:"Kanban",  color:"#059669" },
         ].map(({ key, label, color }, i, arr) => (
@@ -291,7 +427,6 @@ export default function LotPage() {
             onClick={() => {
               if (key==="form") { setForm(initialForm); setEditId(null); }
               setMode(key);
-              if (key!=="form") setRefresh(r=>!r);
             }}
             style={{
               padding:"8px 22px", fontSize:14, fontWeight:700, cursor:"pointer",
@@ -354,12 +489,10 @@ export default function LotPage() {
               className="sm:col-span-3 bg-blue-600 text-white px-6 py-2 rounded shadow w-full font-semibold text-lg mt-2 disabled:opacity-60">
               {loading ? "Enregistrement..." : editId ? "Mettre à jour" : "Enregistrer"}
             </button>
-            {editId && (
-              <button type="button" onClick={handleCancel}
-                className="sm:col-span-3 bg-gray-400 text-white px-6 py-2 rounded shadow w-full font-semibold text-lg">
-                Annuler
-              </button>
-            )}
+            <button type="button" onClick={handleCancel}
+              className="sm:col-span-3 bg-gray-400 text-white px-6 py-2 rounded shadow w-full font-semibold text-lg">
+              Annuler
+            </button>
           </form>
         </Card>
       ) : mode === "list" ? (() => {
@@ -398,6 +531,27 @@ export default function LotPage() {
           background: "#f8fafc",
         });
 
+        const totalPages = Math.max(1, Math.ceil(rows.length / LIST_PAGE_SIZE));
+        const safePage   = Math.min(listPage, totalPages);
+        const pageRows   = rows.slice((safePage - 1) * LIST_PAGE_SIZE, safePage * LIST_PAGE_SIZE);
+
+        const PaginationBar = () => totalPages <= 1 ? null : (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, margin: "10px 0" }}>
+            <button disabled={safePage <= 1} onClick={() => setListPage(p => p - 1)}
+              style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #e2e8f0", background: safePage <= 1 ? "#f8fafc" : "#fff", cursor: safePage <= 1 ? "default" : "pointer", fontSize: 16, color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              ‹
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#374151", minWidth: 80, textAlign: "center" }}>
+              {safePage} / {totalPages}
+            </span>
+            <button disabled={safePage >= totalPages} onClick={() => setListPage(p => p + 1)}
+              style={{ width: 32, height: 32, borderRadius: 6, border: "1px solid #e2e8f0", background: safePage >= totalPages ? "#f8fafc" : "#fff", cursor: safePage >= totalPages ? "default" : "pointer", fontSize: 16, color: "#374151", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              ›
+            </button>
+            <span style={{ fontSize: 11, color: "#9ca3af" }}>{rows.length} lots</span>
+          </div>
+        );
+
         return (
           <div className="mt-2">
             <PageHeader title={`Liste des Lots (${rows.length})`} />
@@ -429,6 +583,8 @@ export default function LotPage() {
               )}
             </div>
 
+            <PaginationBar />
+
             {/* Table triable */}
             <div style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #e5e7eb", background: "#fff" }}>
               <table style={{ minWidth: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -453,7 +609,7 @@ export default function LotPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, idx) => {
+                  {pageRows.map((row, idx) => {
                     const sit = SIT_COLORS[row.situation] || { bg: "#e5e7eb", text: "#374151" };
                     return (
                       <tr key={row.id} style={{ background: idx % 2 === 0 ? "#fff" : "#f8fafc" }}
@@ -473,7 +629,7 @@ export default function LotPage() {
                           </span>
                         </td>
                         <td style={{ padding: "7px 6px", borderBottom: "1px solid #f1f5f9" }}>
-                          <KebabMenu onEdit={() => handleEdit(row)} onDelete={() => handleDelete(row.id)} />
+                          <KebabMenu onEdit={() => handleEdit(row)} onDelete={() => handleDelete(row.id)} onHistorique={() => openHistorique(row)} canEdit={canEdit} />
                         </td>
                       </tr>
                     );
@@ -486,10 +642,65 @@ export default function LotPage() {
             </div>
           </div>
         );
-      })() : (
+      })() : mode === "historique" ? null : (
         <div className="mt-2">
           <PageHeader title="Lots par Tranche" />
-          <LotKanban lots={lots} onEdit={handleEdit} onDelete={handleDelete} />
+          <LotKanban lots={lots} onEdit={handleEdit} onDelete={handleDelete} onHistorique={openHistorique} canEdit={canEdit} />
+        </div>
+      )}
+
+      {/* ── Mode historique ── */}
+      {mode === "historique" && (
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <button onClick={() => setMode(prevMode)} style={{
+            background: "transparent", border: "1px solid #e2e8f0", borderRadius: 8,
+            padding: "6px 14px", fontSize: 13, cursor: "pointer", color: "#374151",
+            fontWeight: 600, marginBottom: 20,
+          }}>← Retour</button>
+
+          {histoLoading && <p style={{ color: "#9ca3af" }}>Chargement…</p>}
+          {!histoLoading && !histoLot && <p style={{ color: "#dc2626", fontSize: 13 }}>Impossible de charger l'historique.</p>}
+
+          {!histoLoading && histoLot && (() => {
+            const { lot, events } = histoLot;
+            const sit = SIT_COLORS[lot.situation] || { bg: "#6b7280", text: "#fff" };
+            return (
+              <>
+                {/* En-tête lot */}
+                <div style={{
+                  background: "#fff", borderRadius: 12, padding: "16px 20px",
+                  border: "1px solid #e5e7eb", marginBottom: 20,
+                  display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12,
+                }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: "#1e3a5f" }}>
+                      {lot.n_titre ? `N° Titre : ${lot.n_titre}` : `Îlot ${lot.ilot} – Lot ${lot.lot}`}
+                    </div>
+                    <div style={{ color: "#6b7280", fontSize: 13, marginTop: 4 }}>
+                      {lot.n_titre && `Îlot ${lot.ilot} – Lot ${lot.lot} · `}
+                      Tranche <b>{lot.tranche || "—"}</b>
+                      {lot.surface > 0 && <> · <b>{lot.surface}</b> m²</>}
+                      {lot.categorie && <> · {lot.categorie}</>}
+                    </div>
+                  </div>
+                  <span style={{ background: sit.bg, color: sit.text, borderRadius: 20, padding: "4px 16px", fontWeight: 700, fontSize: 13 }}>
+                    {lot.situation}
+                  </span>
+                </div>
+
+                {/* Timeline */}
+                <div style={{
+                  background: "#fff", borderRadius: 12, padding: "20px 24px",
+                  border: "1px solid #e5e7eb",
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1, marginBottom: 16 }}>
+                    Timeline — {events.length} événement{events.length !== 1 ? "s" : ""}
+                  </div>
+                  <HistoTimeline events={events} />
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Card, DataTable } from "./ui-kit";
+import { useAuth } from "./AuthContext";
 
 const API = {
-  dossiers:    "http://localhost:8000/api/dossiers/",
-  caisse:      "http://localhost:8000/api/caisse/",
-  lots:        "http://localhost:8000/api/lots/",
-  clients:     "http://localhost:8000/api/clients/",
-  notaires:    "http://localhost:8000/api/notaires/",
-  commerciaux: "http://localhost:8000/api/commerciaux/",
+  dossiers:  "/api/dossiers/",
+  caisse:    "/api/caisse/",
+  bootstrap: "/api/bootstrap/",
+  clients:   "/api/clients/",
+  notaires:  "/api/notaires/",
+  commerciaux: "/api/commerciaux/",
 };
 
 const initialDossier = {
@@ -63,7 +65,11 @@ function SitBadge({ value }) {
 
 // =====================================================
 export default function DossierPage() {
+  const { role } = useAuth(); const canEdit = role === "ADMIN";
+  const location = useLocation();
   const [mode, setMode]         = useState("list");
+
+  useEffect(() => { if (mode === "form" && !canEdit) setMode("list"); }, [canEdit, mode]);
   const [dossiers, setDossiers] = useState([]);
   const [current, setCurrent]   = useState(null);
   const [ops, setOps]           = useState([]);
@@ -103,16 +109,16 @@ export default function DossierPage() {
   const PAGE_SIZE = 20;
 
   useEffect(() => {
-    Promise.all([
-      // Tous les lots (pour affichage dashboard/liste)
-      fetch(API.lots).then(r=>r.json()),
-      fetch(API.clients).then(r=>r.json()),
-      fetch(API.notaires).then(r=>r.json()),
-      fetch(API.commerciaux).then(r=>r.json()),
-      // Lots LIBRE uniquement pour le formulaire (calculé côté serveur)
-      fetch(API.lots + "?situation=LIBRE").then(r=>r.json()),
-    ]).then(([l,c,n,cm,ll]) => { setLots(l); setClients(c); setNotaires(n); setCommerciaux(cm); setLotsLibres(ll); })
-      .catch(()=>{});
+    fetch(API.bootstrap)
+      .then(r => r.json())
+      .then(d => {
+        setLots(d.lots);
+        setLotsLibres(d.lots_libres);
+        setClients(d.clients);
+        setNotaires(d.notaires);
+        setCommerciaux(d.commerciaux);
+      })
+      .catch(() => {});
   }, [refresh]);
 
   useEffect(() => {
@@ -124,6 +130,18 @@ export default function DossierPage() {
     fetch(`${API.caisse}?dossier=${current.id}`)
       .then(r=>r.json()).then(setOps).catch(()=>setOps([]));
   }, [current?.id, refresh]);
+
+  // Ouvrir directement le dashboard si on arrive avec un dossierId dans l'état de navigation
+  useEffect(() => {
+    const id = location.state?.dossierId;
+    if (!id) return;
+    fetch(`${API.dossiers}${id}/`)
+      .then(r => r.json())
+      .then(d => { setCurrent(d); setMode("dashboard"); })
+      .catch(() => {});
+    // Effacer le state pour ne pas ré-ouvrir lors d'un refresh
+    window.history.replaceState({}, "");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
@@ -335,6 +353,14 @@ export default function DossierPage() {
 
   // ---- Colonnes liste ----
   const colsList = [
+    { key:"id", header:"N° Dossier",
+      render: v => (
+        <span style={{
+          fontFamily:"monospace", fontWeight:700, fontSize:12,
+          background:"#eff6ff", color:"#1d4ed8",
+          borderRadius:6, padding:"2px 8px",
+        }}>#{v}</span>
+      )},
     { key:"lot_display",    header:"Lot" },
     { key:"client_display", header:"Client" },
     { key:"situation_dossier", header:"Situation", render: v => <SitBadge value={v} /> },
@@ -351,12 +377,12 @@ export default function DossierPage() {
       render: (_,row) => (
         <span style={{display:"flex", gap:4, alignItems:"center"}}>
           <button onClick={()=>openDashboard(row)} style={btn("blue")}>Ouvrir</button>
-          <button onClick={()=>openForm(row)} title="Modifier"
+          {canEdit && <button onClick={()=>openForm(row)} title="Modifier"
             style={{background:"transparent", border:"1px solid #2563eb", borderRadius:6,
-              padding:"4px 7px", cursor:"pointer", fontSize:15, lineHeight:1, color:"#2563eb"}}>✏️</button>
-          <button onClick={()=>handleDelete(row.id)} title="Supprimer"
+              padding:"4px 7px", cursor:"pointer", fontSize:15, lineHeight:1, color:"#2563eb"}}>✏️</button>}
+          {canEdit && <button onClick={()=>handleDelete(row.id)} title="Supprimer"
             style={{background:"transparent", border:"1px solid #dc2626", borderRadius:6,
-              padding:"4px 7px", cursor:"pointer", fontSize:15, lineHeight:1, color:"#dc2626"}}>🗑️</button>
+              padding:"4px 7px", cursor:"pointer", fontSize:15, lineHeight:1, color:"#dc2626"}}>🗑️</button>}
         </span>
       )},
   ];
@@ -370,13 +396,13 @@ export default function DossierPage() {
     { key:"montant_livre", header:"Reversé",
       render: v => <span style={{fontFamily:"monospace", color:"#7c3aed", fontWeight:600}}>{fmt(v)}</span> },
     { key:"obs_caisse", header:"Observation" },
-    { key:"_act", header:"",
+    ...(canEdit ? [{ key:"_act", header:"",
       render: (_, row) => (
         <span style={{display:"flex", gap:5}}>
           <button onClick={()=>openEditCaisse(row)}        style={btn("oBlue", {padding:"2px 10px", fontSize:12})}>Modifier</button>
           <button onClick={()=>handleDeleteCaisse(row.id)} style={btn("oRed",  {padding:"2px 10px", fontSize:12})}>Supprimer</button>
         </span>
-      )},
+      )}] : []),
   ];
 
   // =====================================================
@@ -394,7 +420,7 @@ export default function DossierPage() {
       <div style={{maxWidth:920, margin:"0 auto"}}>
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20}}>
           <button onClick={()=>{setMode("list"); setRefresh(r=>!r);}} style={btn("gray")}>← Liste</button>
-          <button onClick={()=>openForm(current)} style={btn("oBlue")}>✏ Modifier dossier</button>
+          {canEdit && <button onClick={()=>openForm(current)} style={btn("oBlue")}>✏ Modifier dossier</button>}
         </div>
 
         {error && <div style={{background:"#fee2e2", color:"#991b1b", borderRadius:8, padding:"8px 14px", marginBottom:12, fontSize:13}}>{error}</div>}
@@ -403,7 +429,14 @@ export default function DossierPage() {
         <Card className="mb-4">
           <div style={{display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:12, alignItems:"flex-start"}}>
             <div>
-              <div style={{fontSize:24, fontWeight:800, color:"#1e3a5f"}}>{current.client_display}</div>
+              <div style={{display:"flex", alignItems:"center", gap:10, flexWrap:"wrap"}}>
+                <span style={{fontSize:24, fontWeight:800, color:"#1e3a5f"}}>{current.client_display}</span>
+                <span style={{
+                  fontFamily:"monospace", fontWeight:700, fontSize:13,
+                  background:"#eff6ff", color:"#1d4ed8",
+                  borderRadius:6, padding:"3px 10px",
+                }}>#{current.id}</span>
+              </div>
               <div style={{color:"#374151", fontWeight:600, marginTop:2}}>{current.lot_display}</div>
               <div style={{color:"#6b7280", fontSize:13, marginTop:4}}>
                 Notaire : <b>{current.notaire_display||"—"}</b>
@@ -488,8 +521,17 @@ export default function DossierPage() {
         {showCaisse && (
           <div style={{position:"fixed", inset:0, background:"#0008", zIndex:50, display:"flex", alignItems:"center", justifyContent:"center"}}>
             <div style={{background:"#fff", borderRadius:16, padding:28, width:440, boxShadow:"0 8px 40px #0003"}}>
-              <div style={{fontWeight:800, fontSize:18, marginBottom:18, color:"#1e3a5f"}}>
-                {caisseForm.id ? "Modifier l'opération" : "Nouvelle opération"}
+              <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:18, flexWrap:"wrap"}}>
+                <span style={{fontWeight:800, fontSize:18, color:"#1e3a5f"}}>
+                  {caisseForm.id ? "Modifier l'opération" : "Nouvelle opération"}
+                </span>
+                {current?.id && (
+                  <span style={{
+                    fontFamily:"monospace", fontWeight:700, fontSize:39,
+                    background:"#eff6ff", color:"#1d4ed8",
+                    borderRadius:8, padding:"4px 16px",
+                  }}>#{current.id}</span>
+                )}
               </div>
               <form onSubmit={handleCaisseSubmit} style={{display:"grid", gap:12}}>
                 <label style={{fontSize:13, fontWeight:600, color:"#374151"}}>Type d'opération
@@ -579,8 +621,17 @@ export default function DossierPage() {
   if (mode==="form") {
     return (
       <Card style={{maxWidth:740, margin:"0 auto"}}>
-        <div style={{fontSize:20, fontWeight:800, color:"#1e3a5f", marginBottom:20}}>
-          {editId ? "Modifier le Dossier" : "Nouveau Dossier"}
+        <div style={{display:"flex", alignItems:"center", gap:10, marginBottom:20}}>
+          <span style={{fontSize:20, fontWeight:800, color:"#1e3a5f"}}>
+            {editId ? "Modifier le Dossier" : "Nouveau Dossier"}
+          </span>
+          {editId && (
+            <span style={{
+              fontFamily:"monospace", fontWeight:700, fontSize:39,
+              background:"#eff6ff", color:"#1d4ed8",
+              borderRadius:8, padding:"4px 16px",
+            }}>#{editId}</span>
+          )}
         </div>
         <form onSubmit={handleSubmit} style={{display:"grid", gap:14}}>
           <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
@@ -745,9 +796,9 @@ export default function DossierPage() {
     <div>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16}}>
         <h1 style={{fontSize:24, fontWeight:800, color:"#1e3a5f"}}>Dossiers</h1>
-        <button onClick={()=>openForm()} style={{...btn("blue"), padding:"8px 20px", fontSize:14}}>
+        {canEdit && <button onClick={()=>openForm()} style={{...btn("blue"), padding:"8px 20px", fontSize:14}}>
           + Nouveau
-        </button>
+        </button>}
       </div>
 
       {/* Barre recherche + filtres */}

@@ -6,7 +6,7 @@ from django.urls import path
 from django.shortcuts import redirect
 from django.contrib import messages
 
-from .models import Lot, Client, Notaire, Commercial, Caisse, Dossier
+from .models import Lot, Client, Notaire, Commercial, Caisse, Dossier, UserProfile
 
 
 # =====================================================
@@ -201,3 +201,4 @@ class CaisseAdmin(admin.ModelAdmin):
 admin.site.register(Client)
 admin.site.register(Notaire)
 admin.site.register(Commercial)
+admin.site.register(UserProfile)

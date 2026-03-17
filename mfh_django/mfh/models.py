@@ -1,6 +1,32 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Q, Sum
 from django.core.exceptions import ValidationError
+
+
+# =====================================================
+# USER PROFILE (rôle applicatif)
+# =====================================================
+class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ("ADMIN",      "Administrateur"),
+        ("DIRECTEUR",  "Directeur"),
+        ("VIEWER",     "Lecteur"),
+        ("COMMERCIAL", "Commercial"),
+    ]
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="VIEWER")
+
+    def __str__(self):
+        return f"{self.user.username} ({self.role})"
+
+    class Meta:
+        verbose_name        = "Profil utilisateur"
+        verbose_name_plural = "Profils utilisateurs"
 
 
 # =====================================================
@@ -43,6 +69,13 @@ class Commercial(models.Model):
     email_comm = models.EmailField(blank=True, null=True)
     tel_comm   = models.CharField(max_length=20, blank=True, null=True)
     obs_comm   = models.TextField(blank=True, null=True)
+    # Lien optionnel vers un compte utilisateur Django (rôle COMMERCIAL)
+    user       = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="commercial_entity",
+    )
 
     def __str__(self):
         return self.nom_prenom
@@ -52,6 +85,13 @@ class Commercial(models.Model):
 # LOT
 # =====================================================
 class Lot(models.Model):
+    SITUATION_CHOICES = [
+        ("LIBRE",   "Libre"),
+        ("OPTION",  "Option"),
+        ("RESERVE", "Réservé"),
+        ("VENDU",   "Vendu"),
+    ]
+
     ilot          = models.IntegerField(default=0)
     lot           = models.IntegerField(default=0)
     tranche       = models.CharField(max_length=6, blank=True)
@@ -60,9 +100,16 @@ class Lot(models.Model):
     designation   = models.CharField(max_length=200, blank=True, null=True)
     surface       = models.IntegerField(default=0, null=True)
     prix_reference = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True)
-    # situation est mis à jour automatiquement par Dossier.save()
-    situation     = models.CharField(max_length=10)
-    obs_lot       = models.TextField(blank=True, null=True)
+    # situation est mis à jour par Dossier.save() et LotOptionView
+    situation      = models.CharField(max_length=10, choices=SITUATION_CHOICES, default="LIBRE")
+    obs_lot        = models.TextField(blank=True, null=True)
+
+    # --- Option commerciale ---
+    commercial_option = models.ForeignKey(
+        "Commercial", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="lots_en_option",
+    )
+    date_option = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"Îlot {self.ilot} - Lot {self.lot} (Tr.{self.tranche})"
@@ -162,7 +209,9 @@ class Dossier(models.Model):
     # SYNCHRONISATION LOT
     # -------------------------
     def _sync_lot_situation(self):
-        """Met à jour Lot.situation selon l'état de ce dossier."""
+        """Met à jour Lot.situation selon l'état de ce dossier.
+        Lorsqu'un dossier actif (RESERVE/VENDU) prend le lot, l'option commerciale est effacée.
+        """
         lot = self.lot
         if self.actif:
             mapping = {
@@ -171,12 +220,17 @@ class Dossier(models.Model):
                 "DESISTEMENT": "LIBRE",
             }
             new_sit = mapping.get(self.situation_dossier, "LIBRE")
+            update = {"situation": new_sit}
+            if new_sit in ("VENDU", "RESERVE"):
+                # Le dossier prend la main : on efface l'option
+                update["commercial_option"] = None
+                update["date_option"] = None
+            Lot.objects.filter(pk=lot.pk).update(**update)
         else:
             # Si un autre dossier actif existe → ne pas toucher
             if Dossier.objects.filter(lot=lot, actif=True).exclude(pk=self.pk).exists():
                 return
-            new_sit = "LIBRE"
-        Lot.objects.filter(pk=lot.pk).update(situation=new_sit)
+            Lot.objects.filter(pk=lot.pk).update(situation="LIBRE")
 
     # -------------------------
     # PROPRIÉTÉS FINANCIÈRES
@@ -205,6 +259,30 @@ class Dossier(models.Model):
     @property
     def est_vendu(self):
         return self.operation.filter(type_ops="VENTE").exists()
+
+
+# =====================================================
+# HISTORIQUE LOT (options commerciales)
+# =====================================================
+class HistoriqueLot(models.Model):
+    ACTION_CHOICES = [
+        ("OPTION_ACTIVE",  "Option activée"),
+        ("OPTION_ANNULEE", "Option annulée"),
+    ]
+
+    lot        = models.ForeignKey(Lot,        on_delete=models.CASCADE,  related_name="historique")
+    commercial = models.ForeignKey(Commercial, on_delete=models.SET_NULL, related_name="historique_lots", null=True, blank=True)
+    action     = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    date_action = models.DateField(auto_now_add=True)
+    obs        = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["-date_action", "-id"]
+        verbose_name = "Historique lot"
+        verbose_name_plural = "Historique des lots"
+
+    def __str__(self):
+        return f"{self.lot} — {self.action} — {self.date_action}"
 
 
 # =====================================================

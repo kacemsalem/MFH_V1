@@ -1,24 +1,40 @@
 import { useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "./AuthContext";
 import {
   FaFolderOpen, FaBoxes, FaUsers, FaUserTie, FaBuilding,
   FaChartPie, FaChartBar, FaBars, FaTimes, FaCog, FaShieldAlt,
-  FaArchive, FaFileExport, FaUserShield, FaQuestionCircle,
+  FaArchive, FaFileExport, FaUserShield, FaQuestionCircle, FaTh, FaMobileAlt,
 } from "react-icons/fa";
 
 const SIDEBAR_W = 240;
 const HEADER_H  = 56;
 
-const menu = [
+const MENU_ALL = [
   {
+    roles: ["ADMIN", "DIRECTEUR", "VIEWER"],
     items: [
       { path: "/dossiers", label: "Dossier",  icon: <FaFolderOpen /> },
-      { path: "/lots",     label: "Lots",     icon: <FaBoxes />      },
-      { path: "/synthese", label: "Synthèse", icon: <FaChartBar />   },
+      { path: "/lots",     label: "Lots",      icon: <FaBoxes />      },
+      { path: "/synthese", label: "Synthèse",  icon: <FaChartBar />   },
+    ],
+  },
+  {
+    roles: ["ADMIN", "DIRECTEUR", "VIEWER"],
+    items: [
+      { path: "/lots-kanban", label: "Mise En Option", icon: <FaTh />        },
+      { path: "/lots-mobile", label: "Mobile",          icon: <FaMobileAlt /> },
+    ],
+  },
+  {
+    roles: ["COMMERCIAL"],
+    items: [
+      { path: "/lots-mobile", label: "Mobile", icon: <FaMobileAlt /> },
     ],
   },
   {
     group: "Configuration",
+    roles: ["ADMIN", "DIRECTEUR", "VIEWER"],
     icon: <FaCog />,
     items: [
       { path: "/clients",    label: "Clients",    icon: <FaUsers />    },
@@ -28,24 +44,17 @@ const menu = [
   },
   {
     group: "Administration",
+    roles: ["ADMIN", "DIRECTEUR"],
     icon: <FaShieldAlt />,
     items: [
-      { path: "/archive",    label: "Archive",     icon: <FaArchive />    },
-      { path: "/export",     label: "Export",      icon: <FaFileExport /> },
-      { path: "/utilisateur",label: "Utilisateur", icon: <FaUserShield /> },
-    ],
-  },
-  {
-    group: "Aide",
-    icon: <FaQuestionCircle />,
-    items: [
-      { path: "/aide", label: "Aide", icon: <FaQuestionCircle /> },
+      { path: "/export",       label: "Export",       icon: <FaFileExport /> },
+      { path: "/utilisateurs", label: "Utilisateurs", icon: <FaUserShield /> },
     ],
   },
 ];
 
-// Liste plate pour usePageTitle
-const allItems = menu.flatMap(g => g.items);
+// Liste plate pour usePageTitle (tous rôles confondus)
+const allItems = MENU_ALL.flatMap(g => g.items);
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 768);
@@ -109,7 +118,9 @@ function NavGroup({ group, icon, items, defaultOpen = false }) {
   );
 }
 
-export default function Layout() {
+export default function Layout({ user, onLogout }) {
+  const { role } = useAuth();
+  const menu = MENU_ALL.filter(g => !g.roles || g.roles.includes(role));
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(!isMobile);
   const title = usePageTitle();
@@ -211,8 +222,21 @@ export default function Layout() {
           )}
         </nav>
 
-        <div style={{ padding: "12px 20px", fontSize: 11, color: "#93c5fd", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-          © 2026 MFH
+        <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: "rgba(255,255,255,0.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "white", fontWeight: 700, fontSize: 12, flexShrink: 0,
+          }}>
+            {(user?.fullname || user?.username || "?")[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, color: "white", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {user?.fullname || user?.username}
+            </div>
+            <div style={{ fontSize: 10, color: "#93c5fd" }}>© 2026 MFH</div>
+          </div>
         </div>
       </aside>
 
@@ -260,13 +284,32 @@ export default function Layout() {
                 {new Date().toLocaleDateString("fr-FR", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
               </span>
             )}
-            <div style={{
-              width: 34, height: 34, borderRadius: "50%",
-              background: "linear-gradient(135deg, #1e40af, #3b82f6)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "white", fontWeight: 700, fontSize: 14,
-            }}>
-              A
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: "50%",
+                background: "linear-gradient(135deg, #1e40af, #3b82f6)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "white", fontWeight: 700, fontSize: 14, flexShrink: 0,
+              }}>
+                {(user?.fullname || user?.username || "?")[0].toUpperCase()}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#1e293b" }}>
+                  {user?.fullname || user?.username}
+                </span>
+                {user?.role && (
+                  <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {user.role}
+                  </span>
+                )}
+              </div>
+              <button onClick={onLogout} title="Se déconnecter" style={{
+                background: "transparent", border: "1px solid #e5e7eb",
+                borderRadius: 6, padding: "4px 10px", fontSize: 12,
+                color: "#6b7280", cursor: "pointer", fontWeight: 600, marginLeft: 4,
+              }}>
+                Déconnexion
+              </button>
             </div>
           </div>
         </header>
