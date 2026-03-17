@@ -9,9 +9,9 @@ from django.contrib import messages
 from .models import Lot, Client, Notaire, Commercial, Caisse, Dossier
 
 
-# ======================
+# =====================================================
 # FORMSET CAISSE
-# ==================================================
+# =====================================================
 class CaisseInlineFormSet(BaseInlineFormSet):
     def clean(self):
         super().clean()
