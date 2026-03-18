@@ -126,6 +126,51 @@ function KebabMenu({ onEdit, onDelete, onHistorique, canEdit }) {
   );
 }
 
+// ── Composant select + bouton [+] pour ajouter une valeur ────────────────────
+function SelectWithAdd({ label, name, value, onChange, options, colSpan }) {
+  const [adding, setAdding] = useState(false);
+  const [newVal, setNewVal] = useState("");
+
+  const confirm = () => {
+    const v = newVal.trim();
+    if (v) { onChange({ target: { name, value: v } }); }
+    setAdding(false); setNewVal("");
+  };
+
+  return (
+    <label className={`${colSpan || ""} flex flex-col gap-1 text-sm font-medium text-gray-600`}>
+      {label}
+      <div style={{ display: "flex", gap: 5 }}>
+        <select name={name} value={value} onChange={onChange}
+          className="border p-2 rounded font-normal"
+          style={{ flex: 1 }}>
+          <option value="">— Choisir —</option>
+          {options.map(o => <option key={o} value={o}>{o}</option>)}
+          {value && !options.includes(value) && <option value={value}>{value}</option>}
+        </select>
+        <button type="button" onClick={() => { setAdding(a => !a); setNewVal(""); }}
+          style={{
+            background: "#2563eb", color: "#fff", border: "none",
+            borderRadius: 6, padding: "0 11px", fontSize: 18,
+            cursor: "pointer", fontWeight: 700, lineHeight: 1,
+          }}>+</button>
+      </div>
+      {adding && (
+        <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
+          <input autoFocus value={newVal} onChange={e => setNewVal(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); confirm(); } }}
+            placeholder={`Nouvelle valeur…`}
+            style={{ flex: 1, border: "1px solid #93c5fd", padding: "4px 8px", borderRadius: 6, fontSize: 13 }} />
+          <button type="button" onClick={confirm}
+            style={{ background: "#16a34a", color: "#fff", border: "none", borderRadius: 6, padding: "0 10px", fontSize: 12, cursor: "pointer", fontWeight: 700 }}>OK</button>
+          <button type="button" onClick={() => { setAdding(false); setNewVal(""); }}
+            style={{ background: "#9ca3af", color: "#fff", border: "none", borderRadius: 6, padding: "0 8px", fontSize: 12, cursor: "pointer" }}>✕</button>
+        </div>
+      )}
+    </label>
+  );
+}
+
 const KANBAN_LOTS_PER_PAGE = 40;
 
 function LotKanban({ lots, onEdit, onDelete, onHistorique, canEdit }) {
@@ -444,6 +489,10 @@ export default function LotPage() {
       {mode === "form" ? (
         <Card className="max-w-2xl mx-auto mt-2">
           <PageHeader title={editId ? "Modifier le Lot" : "Saisie Lot"} />
+          {(() => {
+            const uniqTranches = [...new Set(lots.map(l => l.tranche || "").filter(Boolean))].sort((a,b) => a.localeCompare(b, undefined, { numeric: true }));
+            const uniqCats     = [...new Set(lots.map(l => l.categorie || "").filter(Boolean))].sort();
+            return (
           <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
             {/* Ligne 1 : N° Titre | Situation */}
             <label className="sm:col-span-2 flex flex-col gap-1 text-sm font-medium text-gray-600">N° Titre
@@ -452,14 +501,13 @@ export default function LotPage() {
             <label className="flex flex-col gap-1 text-sm font-medium text-gray-600">Situation
               <select name="situation" value={form.situation} onChange={handleChange} className="border p-2 rounded font-normal">
                 <option value="LIBRE">LIBRE</option>
-                <option value="RESERVE">RESERVE</option>
+                <option value="RESERVE">RÉSERVÉ</option>
                 <option value="VENDU">VENDU</option>
+                <option value="OPTION">OPTION</option>
               </select>
             </label>
             {/* Ligne 2 : Tranche | Ilot | Lot */}
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-600">Tranche
-              <input name="tranche" value={form.tranche} onChange={handleChange} className="border p-2 rounded font-normal" />
-            </label>
+            <SelectWithAdd label="Tranche" name="tranche" value={form.tranche} onChange={handleChange} options={uniqTranches} />
             <label className="flex flex-col gap-1 text-sm font-medium text-gray-600">Ilot
               <input name="ilot" value={form.ilot} onChange={handleChange} className="border p-2 rounded font-normal" type="number" />
             </label>
@@ -467,9 +515,7 @@ export default function LotPage() {
               <input name="lot" value={form.lot} onChange={handleChange} className="border p-2 rounded font-normal" type="number" />
             </label>
             {/* Ligne 3 : Catégorie | Surface | Prix de référence */}
-            <label className="flex flex-col gap-1 text-sm font-medium text-gray-600">Catégorie
-              <input name="categorie" value={form.categorie} onChange={handleChange} className="border p-2 rounded font-normal" />
-            </label>
+            <SelectWithAdd label="Catégorie" name="categorie" value={form.categorie} onChange={handleChange} options={uniqCats} />
             <label className="flex flex-col gap-1 text-sm font-medium text-gray-600">Surface
               <input name="surface" value={form.surface} onChange={handleChange} className="border p-2 rounded font-normal" type="number" />
             </label>
@@ -494,6 +540,8 @@ export default function LotPage() {
               Annuler
             </button>
           </form>
+            );
+          })()}
         </Card>
       ) : mode === "list" ? (() => {
         // Valeurs uniques pour les filtres
