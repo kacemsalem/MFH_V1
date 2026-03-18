@@ -15,12 +15,12 @@ const daysSince = dateStr => {
 };
 
 function LotCard({ lot, dossByLot }) {
-  const sit = SIT[lot.situation] || { label: lot.situation, color: "#6b7280", bg: "#f9fafb" };
-  const isVente = (lot.situation === "VENDU" || lot.situation === "RESERVE") && lot.dossier_prix_vente;
-  const prixVal = isVente ? Number(lot.dossier_prix_vente) : Number(lot.prix_reference || 0);
-  const prixTag = isVente ? "(P. vente)" : "(P. réf)";
-  const pm2     = lot.surface > 0 && prixVal > 0 ? Math.round(prixVal / lot.surface) : 0;
+  const sit     = SIT[lot.situation] || { label: lot.situation, color: "#6b7280", bg: "#f9fafb" };
   const dossier = dossByLot[lot.id];
+  const isVente = (lot.situation === "VENDU" || lot.situation === "RESERVE") && dossier?.prix_vente;
+  const prixVal = isVente ? Number(dossier.prix_vente) : Number(lot.prix_reference || 0);
+  const prixTag = isVente ? "Pr. vente" : "Pr. réf";
+  const pm2     = lot.surface > 0 && prixVal > 0 ? Math.round(prixVal / lot.surface) : 0;
 
   return (
     <div style={{
@@ -55,9 +55,8 @@ function LotCard({ lot, dossByLot }) {
       {/* Prix + surface sur une ligne */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3, marginTop: 5 }}>
         <div style={{ fontSize: 12 }}>
-          <span style={{ color: "#6b7280", fontSize: 11 }}>Prix </span>
+          <span style={{ color: "#6b7280", fontSize: 11 }}>{prixTag} </span>
           <b style={{ color: "#1e3a8a", fontFamily: "monospace" }}>{fmt(prixVal)}</b>
-          {" "}<span style={{ color: "#94a3b8", fontSize: 10 }}>{prixTag}</span>
         </div>
         {lot.surface > 0 && (
           <div style={{ fontSize: 11, color: "#6b7280" }}>
