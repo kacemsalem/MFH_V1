@@ -72,9 +72,25 @@ class DossierSerializer(serializers.ModelSerializer):
     lot_lot       = serializers.SerializerMethodField()
     lot_n_titre   = serializers.SerializerMethodField()
     lot_categorie = serializers.SerializerMethodField()
+
     class Meta:
         model = Dossier
         fields = "__all__"
+
+    def _wrap(self, fn, *args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except DjangoValidationError as e:
+            msgs = e.message_dict if hasattr(e, "message_dict") else {"non_field_errors": e.messages}
+            raise DRFValidationError(msgs)
+        except IntegrityError as e:
+            raise DRFValidationError({"non_field_errors": [str(e)]})
+
+    def create(self, validated_data):
+        return self._wrap(super().create, validated_data)
+
+    def update(self, instance, validated_data):
+        return self._wrap(super().update, instance, validated_data)
 
     def get_total_recu(self, obj):
         v = getattr(obj, "total_recu_ann", None)

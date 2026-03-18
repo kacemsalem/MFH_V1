@@ -193,8 +193,9 @@ export default function DossierPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const d = await res.json();
-        throw new Error(Object.values(d).flat().join(" | "));
+        let msg = `Erreur ${res.status}`;
+        try { const d = await res.json(); msg = Object.values(d).flat().join(" | "); } catch {}
+        throw new Error(msg);
       }
       setMode("list"); setRefresh(r=>!r);
     } catch(err) { setError(err.message); }
