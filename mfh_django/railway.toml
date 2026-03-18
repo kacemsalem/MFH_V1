@@ -2,6 +2,6 @@
 dockerfilePath = "Dockerfile"
 
 [deploy]
-healthcheckPath = "/api/auth/me/"
+healthcheckPath = "/admin/login/"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
