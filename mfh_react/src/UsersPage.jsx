@@ -62,6 +62,12 @@ export default function UsersPage() {
     setError("");
   };
 
+  const handleDelete = async (row) => {
+    if (!window.confirm(`Supprimer définitivement l'utilisateur "${row.username}" ?`)) return;
+    await fetch(`${API_USERS}${row.id}/`, { method: "DELETE" });
+    setRefresh(r => !r);
+  };
+
   const handleToggleActive = async (row) => {
     await fetch(`${API_USERS}${row.id}/`, {
       method: "PATCH",
@@ -103,9 +109,10 @@ export default function UsersPage() {
       render: (_, row) => (
         <span style={{ display: "flex", gap: 6 }}>
           <button onClick={() => handleEdit(row)} style={btnStyle("#2563eb")}>Modifier</button>
-          <button onClick={() => handleToggleActive(row)} style={btnStyle(row.is_active ? "#dc2626" : "#059669")}>
+          <button onClick={() => handleToggleActive(row)} style={btnStyle(row.is_active ? "#d97706" : "#059669")}>
             {row.is_active ? "Désactiver" : "Activer"}
           </button>
+          <button onClick={() => handleDelete(row)} style={btnStyle("#dc2626")}>Supprimer</button>
         </span>
       )},
   ];
