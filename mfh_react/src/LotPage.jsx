@@ -499,12 +499,16 @@ export default function LotPage() {
               <input name="n_titre" value={form.n_titre} onChange={handleChange} className="border p-2 rounded font-normal" />
             </label>
             <label className="flex flex-col gap-1 text-sm font-medium text-gray-600">Situation
-              <select name="situation" value={form.situation} onChange={handleChange} className="border p-2 rounded font-normal">
-                <option value="LIBRE">LIBRE</option>
-                <option value="RESERVE">RÉSERVÉ</option>
-                <option value="VENDU">VENDU</option>
-                <option value="OPTION">OPTION</option>
-              </select>
+              {editId ? (
+                <select name="situation" value={form.situation} onChange={handleChange} className="border p-2 rounded font-normal">
+                  <option value="LIBRE">LIBRE</option>
+                  <option value="RESERVE">RÉSERVÉ</option>
+                  <option value="VENDU">VENDU</option>
+                  <option value="OPTION">OPTION</option>
+                </select>
+              ) : (
+                <input value="LIBRE" readOnly className="border p-2 rounded font-normal bg-gray-50 text-gray-400 cursor-not-allowed" />
+              )}
             </label>
             {/* Ligne 2 : Tranche | Ilot | Lot */}
             <SelectWithAdd label="Tranche" name="tranche" value={form.tranche} onChange={handleChange} options={uniqTranches} />
