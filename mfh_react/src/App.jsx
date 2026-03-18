@@ -71,7 +71,7 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, role }}>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.VITE_BASE_PATH || ''}>
         <Suspense fallback={<div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", color:"#94a3b8", fontSize:15 }}>Chargement…</div>}>
         <Routes>
           <Route element={<Layout user={user} onLogout={handleLogout} />}>
