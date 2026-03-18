@@ -12,7 +12,9 @@ const ClientPage    = lazy(() => import("./ClientPage"));
 const NotairePage   = lazy(() => import("./NotairePage"));
 const CommercialPage= lazy(() => import("./CommercialPage"));
 const DossierPage   = lazy(() => import("./DossierPage"));
-const ExportPage    = lazy(() => import("./ExportPage"));
+const ExportPage              = lazy(() => import("./ExportPage"));
+const ConsultationDossierPage = lazy(() => import("./ConsultationDossierPage"));
+const SuiviLotsPage           = lazy(() => import("./SuiviLotsPage"));
 const SynthesePage  = lazy(() => import("./SynthesePage"));
 const UsersPage     = lazy(() => import("./UsersPage"));
 
@@ -60,8 +62,12 @@ export default function App() {
   }
 
   const role = user.role ?? "VIEWER";
-  // COMMERCIAL : accès limité à la vue kanban
-  const defaultPath = role === "COMMERCIAL" ? "/lots-mobile" : "/lots";
+
+  const defaultPath = role === "COMMERCIAL" ? "/lots-mobile"
+                    : role === "VIEWER"     ? "/consultation-dossiers"
+                    : "/lots";
+
+  const isAdmin = role === "ADMIN" || role === "DIRECTEUR";
 
   return (
     <AuthContext.Provider value={{ user, role }}>
@@ -70,25 +76,37 @@ export default function App() {
         <Routes>
           <Route element={<Layout user={user} onLogout={handleLogout} />}>
             <Route index element={<Navigate to={defaultPath} replace />} />
-            {/* COMMERCIAL : uniquement vue mobile terrain */}
+
+            {/* ── COMMERCIAL : mobile uniquement ── */}
             {role === "COMMERCIAL" && (
               <Route path="/lots-mobile" element={<LotsMobilePage />} />
             )}
-            {/* ADMIN + VIEWER */}
-            {role !== "COMMERCIAL" && <>
-              <Route path="/lots"         element={<LotPage />} />
-              <Route path="/lots-kanban"  element={<LotKanbanPage />} />
-              <Route path="/lots-mobile"  element={<LotsMobilePage />} />
-              <Route path="/clients"      element={<ClientPage />} />
-              <Route path="/dossiers"     element={<DossierPage />} />
-              <Route path="/notaire"      element={<NotairePage />} />
-              <Route path="/commercial"   element={<CommercialPage />} />
-              <Route path="/export"       element={<ExportPage />} />
-              <Route path="/synthese"     element={<SynthesePage />} />
+
+            {/* ── VIEWER (Lecteur) : Direction uniquement ── */}
+            {role === "VIEWER" && <>
+              <Route path="/consultation-dossiers" element={<ConsultationDossierPage />} />
+              <Route path="/suivi-lots"            element={<SuiviLotsPage />} />
+              <Route path="/synthese"              element={<SynthesePage />} />
+              <Route path="/export"                element={<ExportPage />} />
             </>}
-            {(role === "ADMIN" || role === "DIRECTEUR") &&
-              <Route path="/utilisateurs" element={<UsersPage />} />
-            }
+
+            {/* ── ADMIN + DIRECTEUR : accès complet ── */}
+            {isAdmin && <>
+              <Route path="/lots"                  element={<LotPage />} />
+              <Route path="/lots-kanban"           element={<LotKanbanPage />} />
+              <Route path="/lots-mobile"           element={<LotsMobilePage />} />
+              <Route path="/clients"               element={<ClientPage />} />
+              <Route path="/dossiers"              element={<DossierPage />} />
+              <Route path="/notaire"               element={<NotairePage />} />
+              <Route path="/commercial"            element={<CommercialPage />} />
+              <Route path="/export"                element={<ExportPage />} />
+              <Route path="/synthese"              element={<SynthesePage />} />
+              <Route path="/consultation-dossiers" element={<ConsultationDossierPage />} />
+              <Route path="/suivi-lots"            element={<SuiviLotsPage />} />
+              <Route path="/utilisateurs"          element={<UsersPage />} />
+            </>}
+
+            {/* Toute URL inconnue ou non autorisée → page par défaut */}
             <Route path="*" element={<Navigate to={defaultPath} replace />} />
           </Route>
         </Routes>

@@ -1,0 +1,24 @@
+services:
+
+  django:
+    build:
+      context: ./mfh_django
+      dockerfile: Dockerfile.prod
+    container_name: mfh_django
+    env_file: ./mfh_django/.env
+    volumes:
+      - ./mfh_django:/app
+    ports:
+      - "8000:8000"
+
+  react:
+    build:
+      context: ./mfh_react
+      dockerfile: Dockerfile.prod
+    container_name: mfh_react
+    environment:
+      - DJANGO_API_URL=http://django:8000
+    ports:
+      - "80:80"
+    depends_on:
+      - django

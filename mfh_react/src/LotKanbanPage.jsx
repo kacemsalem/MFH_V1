@@ -27,6 +27,7 @@ function useIsMobile() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtDate = v => v ? v.split("-").reverse().join("/") : "";
+const fmt     = v => Number(v || 0).toLocaleString("fr-FR");
 
 // ── StatBadge ─────────────────────────────────────────────────────────────────
 function StatBadge({ color, label, count }) {
@@ -62,7 +63,8 @@ function LotCard({ lot, onActivateOption, onCancelOption, onCreateDossier, canOp
           {lot.n_titre || `Îlot ${lot.ilot} – Lot ${lot.lot}`}
         </div>
         <span style={{
-          background: sit.badge, color: "#fff",
+          background: `${sit.badge}18`, color: sit.badge,
+          border: `1px solid ${sit.badge}40`,
           fontSize: 9, fontWeight: 700, padding: "2px 8px",
           borderRadius: 10, letterSpacing: 0.5, whiteSpace: "nowrap", flexShrink: 0,
         }}>
@@ -70,16 +72,33 @@ function LotCard({ lot, onActivateOption, onCancelOption, onCreateDossier, canOp
         </span>
       </div>
 
-      {/* Infos */}
-      <div style={{ fontSize: 12, color: "#475569", lineHeight: 1.8 }}>
+      {/* Infos compactes */}
+      <div style={{ fontSize: 12, color: "#475569" }}>
         {lot.n_titre && (
-          <div style={{ color: "#94a3b8" }}>Îlot {lot.ilot} – Lot {lot.lot}</div>
+          <div style={{ color: "#94a3b8", marginBottom: 2 }}>Îlot {lot.ilot} – Lot {lot.lot}</div>
         )}
-        {lot.surface > 0 && (
-          <div><span style={{ color: "#94a3b8" }}>Surface :</span> <b>{lot.surface}</b> m²</div>
-        )}
-        {lot.categorie && (
-          <div><span style={{ color: "#94a3b8" }}>Cat. :</span> {lot.categorie}</div>
+        {/* Prix sur une ligne */}
+        {(() => {
+          const isVente = (lot.situation === "VENDU" || lot.situation === "RESERVE") && lot.dossier_prix_vente;
+          const prixVal = isVente ? lot.dossier_prix_vente : lot.prix_reference;
+          const prixTag = isVente ? "(P. vente)" : "(P. réf)";
+          const pm2 = lot.surface > 0 && prixVal > 0 ? Math.round(Number(prixVal) / lot.surface) : 0;
+          return prixVal ? (
+            <div style={{ marginBottom: 2 }}>
+              <span style={{ color: "#94a3b8" }}>Prix </span>
+              <b style={{ color: "#1e3a8a", fontFamily: "monospace" }}>{fmt(prixVal)}</b>
+              {" "}<span style={{ color: "#94a3b8", fontSize: 10 }}>{prixTag}</span>
+              {pm2 > 0 && <span style={{ color: "#94a3b8", fontSize: 10 }}> · {fmt(pm2)}/m²</span>}
+            </div>
+          ) : null;
+        })()}
+        {/* Surface + catégorie sur une ligne */}
+        {(lot.surface > 0 || lot.categorie) && (
+          <div style={{ color: "#64748b", fontSize: 11 }}>
+            {lot.surface > 0 && <span>{lot.surface} m²</span>}
+            {lot.surface > 0 && lot.categorie && <span> · </span>}
+            {lot.categorie && <span>{lot.categorie}</span>}
+          </div>
         )}
       </div>
 

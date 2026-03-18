@@ -4,9 +4,9 @@ import { useAuth } from "./AuthContext";
 const BASE = "/api";
 
 const SIT = {
-  LIBRE:   { label: "Libre",   bg: "#16a34a", light: "#f0fdf4", border: "#bbf7d0", text: "#fff" },
-  OPTION:  { label: "Option",  bg: "#d97706", light: "#fffbeb", border: "#fde68a", text: "#fff" },
-  RESERVE: { label: "Réservé", bg: "#2563eb", light: "#eff6ff", border: "#bfdbfe", text: "#fff" },
+  LIBRE:   { label: "Libre",   bg: "#16a34a", light: "#16a34a0d", border: "#16a34a30", text: "#16a34a" },
+  OPTION:  { label: "Option",  bg: "#d97706", light: "#d977060d", border: "#d9770630", text: "#d97706" },
+  RESERVE: { label: "Réservé", bg: "#2563eb", light: "#2563eb0d", border: "#2563eb30", text: "#2563eb" },
 };
 
 const fmtDate = v => v ? v.split("-").reverse().join("/") : "—";
@@ -44,7 +44,8 @@ function LotCard({ lot, onActivate, onCancel, canOption, myCommId, isAdmin }) {
           {lot.n_titre || `Îlot ${lot.ilot} – Lot ${lot.lot}`}
         </span>
         <span style={{
-          background: sit.bg, color: sit.text,
+          background: `${sit.bg}18`, color: sit.bg,
+          border: `1px solid ${sit.bg}40`,
           fontSize: 10, fontWeight: 700, padding: "3px 8px",
           borderRadius: 20, whiteSpace: "nowrap", flexShrink: 0,
         }}>

@@ -13,18 +13,28 @@ const HEADER_H  = 56;
 
 const MENU_ALL = [
   {
-    roles: ["ADMIN", "DIRECTEUR", "VIEWER"],
+    group: "Gestionnaire",
+    icon: <FaCog />,
+    roles: ["ADMIN", "DIRECTEUR"],
     items: [
-      { path: "/dossiers", label: "Dossier",  icon: <FaFolderOpen /> },
-      { path: "/lots",     label: "Lots",      icon: <FaBoxes />      },
-      { path: "/synthese", label: "Synthèse",  icon: <FaChartBar />   },
+      { path: "/dossiers",    label: "Dossier",      icon: <FaFolderOpen /> },
+      { path: "/lots",        label: "Lots",          icon: <FaBoxes />      },
+      { path: "/lots-kanban", label: "Suivi Option",  icon: <FaTh />         },
+      { separator: true },
+      { path: "/clients",     label: "Client",        icon: <FaUsers />      },
+      { path: "/notaire",     label: "Notaire",       icon: <FaUserTie />    },
+      { path: "/commercial",  label: "Commercial",    icon: <FaBuilding />   },
     ],
   },
   {
+    group: "Direction",
+    icon: <FaChartBar />,
     roles: ["ADMIN", "DIRECTEUR", "VIEWER"],
     items: [
-      { path: "/lots-kanban", label: "Mise En Option", icon: <FaTh />        },
-      { path: "/lots-mobile", label: "Mobile",          icon: <FaMobileAlt /> },
+      { path: "/consultation-dossiers", label: "Consultation Dossier", icon: <FaFolderOpen /> },
+      { path: "/suivi-lots", label: "Suivi Lots", icon: <FaBoxes /> },
+      { path: "/synthese", label: "Synthèse", icon: <FaChartBar />   },
+      { path: "/export",   label: "Export Excel", icon: <FaFileExport /> },
     ],
   },
   {
@@ -34,34 +44,19 @@ const MENU_ALL = [
     ],
   },
   {
-    group: "Configuration",
-    roles: ["ADMIN", "DIRECTEUR", "VIEWER"],
-    icon: <FaCog />,
-    items: [
-      { path: "/clients",    label: "Clients",    icon: <FaUsers />    },
-      { path: "/notaire",    label: "Notaire",    icon: <FaUserTie />  },
-      { path: "/commercial", label: "Commercial", icon: <FaBuilding /> },
-    ],
-  },
-  {
     group: "Administration",
     roles: ["ADMIN", "DIRECTEUR"],
     icon: <FaShieldAlt />,
     items: [
-      { path: "/export",       label: "Export",       icon: <FaFileExport /> },
+      { path: "/lots-mobile",  label: "Mobile",       icon: <FaMobileAlt />  },
       { path: "/utilisateurs", label: "Utilisateurs", icon: <FaUserShield /> },
-    ],
-  },
-  {
-    roles: ["ADMIN"],
-    items: [
       { path: import.meta.env.VITE_DJANGO_ADMIN_URL || "http://127.0.0.1:8000/admin/", label: "Admin MFH", icon: <FaTools />, external: true },
     ],
   },
 ];
 
 // Liste plate pour usePageTitle (tous rôles confondus)
-const allItems = MENU_ALL.flatMap(g => g.items);
+const allItems = MENU_ALL.flatMap(g => g.items).filter(i => i.path && !i.soon && !i.separator);
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(window.innerWidth < 768);
@@ -100,27 +95,57 @@ function NavGroup({ group, icon, items, defaultOpen = false }) {
         <span style={{ flex: 1, textAlign: "left" }}>{group}</span>
         <span style={{ fontSize: 10, opacity: 0.7 }}>{expanded ? "▲" : "▼"}</span>
       </button>
-      {expanded && items.map(item => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          style={({ isActive }) => ({
+      {expanded && items.map((item, i) => {
+        if (item.separator) return (
+          <div key={`sep-${i}`} style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", margin: "6px 20px" }} />
+        );
+        if (item.soon) return (
+          <div key={`soon-${i}`} style={{
             display: "flex", alignItems: "center", gap: 12,
-            padding: "9px 20px 9px 36px",
-            color: isActive ? "white" : "#bfdbfe",
-            background: isActive ? "rgba(255,255,255,0.15)" : "transparent",
-            fontWeight: isActive ? 600 : 400,
-            fontSize: 14,
-            textDecoration: "none",
-            borderRadius: "0 24px 24px 0",
-            marginRight: 12, marginBottom: 1,
-            transition: "background 0.15s",
-          })}
-        >
-          <span style={{ fontSize: 15 }}>{item.icon}</span>
-          <span>{item.label}</span>
-        </NavLink>
-      ))}
+            padding: "9px 20px 9px 36px", opacity: 0.4,
+            fontSize: 14, color: "#bfdbfe",
+          }}>
+            <span style={{ fontSize: 15 }}>{item.icon}</span>
+            <span style={{ flex: 1 }}>{item.label}</span>
+            <span style={{ fontSize: 9, background: "rgba(255,255,255,0.2)", borderRadius: 4, padding: "1px 5px", fontWeight: 700 }}>SOON</span>
+          </div>
+        );
+        if (item.external) return (
+          <button key={item.path}
+            onClick={() => { window.location.href = item.path; }}
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "9px 20px 9px 36px", width: "100%",
+              color: "#fbbf24", background: "transparent",
+              border: "none", cursor: "pointer",
+              fontSize: 14, fontWeight: 600,
+            }}>
+            <span style={{ fontSize: 15 }}>{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        );
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            style={({ isActive }) => ({
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "9px 20px 9px 36px",
+              color: isActive ? "white" : "#bfdbfe",
+              background: isActive ? "rgba(255,255,255,0.15)" : "transparent",
+              fontWeight: isActive ? 600 : 400,
+              fontSize: 14,
+              textDecoration: "none",
+              borderRadius: "0 24px 24px 0",
+              marginRight: 12, marginBottom: 1,
+              transition: "background 0.15s",
+            })}
+          >
+            <span style={{ fontSize: 15 }}>{item.icon}</span>
+            <span>{item.label}</span>
+          </NavLink>
+        );
+      })}
     </div>
   );
 }

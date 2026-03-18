@@ -30,10 +30,18 @@ class LotSerializer(serializers.ModelSerializer):
     # Situation affichée = annotation situation_reelle si dispo, sinon champ DB
     # Le champ situation reste writable pour les sauvegardes du formulaire
     commercial_option_display = serializers.SerializerMethodField()
+    dossier_prix_vente        = serializers.SerializerMethodField()
 
     def get_commercial_option_display(self, obj):
         c = obj.commercial_option
         return c.nom_prenom if c else None
+
+    def get_dossier_prix_vente(self, obj):
+        try:
+            d = obj.dossier_set.filter(actif=True).first()
+            return str(d.prix_vente) if d and d.prix_vente else None
+        except Exception:
+            return None
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -58,6 +66,12 @@ class DossierSerializer(serializers.ModelSerializer):
     client_display     = serializers.SerializerMethodField()
     notaire_display    = serializers.SerializerMethodField()
     commercial_display = serializers.SerializerMethodField()
+    # Champs lot pour consultation
+    lot_tranche   = serializers.SerializerMethodField()
+    lot_ilot      = serializers.SerializerMethodField()
+    lot_lot       = serializers.SerializerMethodField()
+    lot_n_titre   = serializers.SerializerMethodField()
+    lot_categorie = serializers.SerializerMethodField()
     class Meta:
         model = Dossier
         fields = "__all__"
@@ -114,21 +128,25 @@ class DossierSerializer(serializers.ModelSerializer):
         except Exception:
             return f"Commercial #{obj.commercial_id}"
 
-    # Conversion ValidationError Django → DRF (400 au lieu de 500)
-    def _wrap(self, fn, *args, **kwargs):
-        try:
-            return fn(*args, **kwargs)
-        except DjangoValidationError as e:
-            msgs = e.message_dict if hasattr(e, "message_dict") else {"non_field_errors": e.messages}
-            raise DRFValidationError(msgs)
-        except IntegrityError as e:
-            raise DRFValidationError({"non_field_errors": [str(e)]})
+    def get_lot_tranche(self, obj):
+        try: return obj.lot.tranche
+        except Exception: return None
 
-    def create(self, validated_data):
-        return self._wrap(super().create, validated_data)
+    def get_lot_ilot(self, obj):
+        try: return obj.lot.ilot
+        except Exception: return None
 
-    def update(self, instance, validated_data):
-        return self._wrap(super().update, instance, validated_data)
+    def get_lot_lot(self, obj):
+        try: return obj.lot.lot
+        except Exception: return None
+
+    def get_lot_n_titre(self, obj):
+        try: return obj.lot.n_titre or ""
+        except Exception: return ""
+
+    def get_lot_categorie(self, obj):
+        try: return obj.lot.categorie or ""
+        except Exception: return ""
 
 
 class CaisseSerializer(serializers.ModelSerializer):
